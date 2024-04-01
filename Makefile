@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -std=c++17 -march=native -O2 -Wall -Werror
+CXXFLAGS = -std=c++17 -march=native -O0 -g -Wall -Werror -DLOGRUS_WITH_LOC
 
 SRCS = \
 	logrus.cpp \

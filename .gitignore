@@ -2,3 +2,5 @@
 spdlog/
 example
 *.o
+*.log
+compile_commands.json

@@ -65,8 +65,47 @@ LOG_FATAL("Fail to listen", KV("ip", "127.0.0.1"), KV("port", 80));
 LOG_ERROR("Fail to open", KERR(errno), KV("file", "foo"));
 ```
 
-**Recommend using macros to make your logs more structured.**
+Set log format and level.
+```cpp
+logrus::set_pattern("%^%l%$ %Y%m%d %H:%M:%S %t  %v");
+logrus::set_level(logrus::kTrace);
+
+// trace 20240401 17:41:29 4106841  msg='hello world!'
+logrus::trace("hello world!");
+
+// debug 20240401 17:41:29 4106841  msg='hello world!'
+logrus::debug("hello world!");
+
+// info 20240401 17:41:29 4106841  msg='hello world!
+logrus::info("hello world!");
+```
+
+Create file rotating logger.
+```cpp
+// Set file logger.
+logrus::set_rotating("default", "./default.log", 1024 * 1024 * 10, 3);
+logrus::info("hello world!");
+LOG_INFO("hello world!");
+// $ cat default.log 
+// info 20240401 17:46:34 4107467  msg='hello world!'
+// info 20240401 17:46:34 4107467  msg='hello world!'
+
+logrus::Logger l;
+l.set_rotating("custom", "./custom.log", 1024 * 1024 * 10, 3);
+l.info("hello world!");
+LOG_INFO_(l, "hello world!");
+// $ cat custom.log 
+// [2024-04-01 17:46:34.804] [custom] [info] msg='hello world!'
+// [2024-04-01 17:46:34.804] [custom] [info] msg='hello world!'
+```
+
+Compile flag *-DLOGRUS_WITH_LOC* could enable *FILE*/*LINE*/*FUNCTION*.
+```
+[2024-04-01 17:51:27.964] [error] [example.cpp:27] msg='Fail to open' error='Operation not permitted' file='foo'
+```
+
+**NOTE**
+> Recommend using macros to make your logs more structured.
 
 ## TODO
-1. Add custom *Formatter*.
-2. Add *spdlog::logger* option.
+- Improve performance
