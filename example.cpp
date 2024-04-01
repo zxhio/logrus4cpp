@@ -1,29 +1,26 @@
 #include "logrus.h"
 
-#include <vector>
-
 int main() {
-  spdlog::set_pattern("%^%4!l%$ %Y%m%d %H:%M:%S %v");
-
   logrus::info("hello world!");
-  logrus::warn("hello 2024");
-  logrus::debug("2023, bye!");
 
-  logrus::with_field("key1", "xyz").info("Test c str");
-  logrus::with_field("key2", std::string("std::string")).info("Test std::string");
-  logrus::with_field("key3", 1).info("Test int");
-  logrus::with_field("key4", 3.14).info("Test double");
-  logrus::with_field("key5", 'c').info("Test char");
+  logrus::with_field("port", 80).info("Listen on");
+  logrus::with_field("addr", "127.0.0.1:80").info("Listen on");
 
-  logrus::with_field("ip", "127.0.0.1").with_field("port", 80).info("with_fieldx2");
-  logrus::with_fields(logrus::Field("ip", "127.0.0.1"), logrus::Field("port", 80)).info("with_fields");
-  logrus::with_fields(logrus::Field("ip", "127.0.0.1"), logrus::Field("port", 80)).with_field("proto", "tcp").info("with_fields+with_field");
+  logrus::with_field("ip", "127.0.0.1")
+      .with_field("port", 80)
+      .info("Listen on");
 
-  auto l = logrus::with_field("task_id", 1);
-  l.with_fields(logrus::Field("ip", "127.0.0.1"), logrus::Field("port", 80)).info("Listen on");
-  l.with_field("path", "xx.sock").info("Listen on");
+  logrus::with_fields({{"ip", "127.0.0.1"}, {"port", 80}}).info("Listen on");
 
-  LOG_INFO("Task done");
-  LOG_INFO("New conn", KV("addr", "127.0.0.1:80"));
-  LOG_INFO("Updated version", KV("from", "1.6.1"), KV("to", "2.0.0"), KV("task_id", 2));
+  logrus::Entry x = logrus::with_field("id", 1).with_fields(
+      {{"ip", "127.0.0.1"}, {"port", 80}});
+  x.with_field("proto", "udp").info("Listen on");
+  x.with_field("proto", "tcp").info("Listen on");
+
+  // Use macro to log.
+  LOG_INFO("hello world!");
+  LOG_INFO("Listen on", KV("port", 80));
+  LOG_INFO("Listen on", KV("ip", "127.0.0.1"), KV("port", 80));
+
+  LOG_FATAL("Fail to Listen", KV("ip", "127.0.0.1"), KV("port", 80));
 }

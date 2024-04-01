@@ -2,3 +2,4 @@ Language: Cpp
 
 ColumnLimit: 80
 IndentWidth: 2
+AlwaysBreakTemplateDeclarations: Yes

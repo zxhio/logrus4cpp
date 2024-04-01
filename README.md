@@ -6,52 +6,58 @@ A structured logging interface similar to logrus based on spdlog, implemented us
 
 Only msg log.
 ```cpp
-// info 20240207 15:08:15 msg='hello world!'
+// [2024-04-01 10:27:33.063] [info] msg='hello world!'
 logrus::info("hello world!");
 ```
 
 Contains single field log.
 ```cpp
-// info 20240207 15:08:15 msg='Test c str' key1='xyz'
-logrus::with_field("key1", "xyz").info("Test c str");
+// [2024-04-01 10:27:33.063] [info] msg='Listen on' port='80'
+logrus::with_field("port", 80).info("Listen on");
 
-// info 20240207 15:08:15 msg='Test int' key3='1'
-logrus::with_field("key3", 1).info("Test int");
+// [2024-04-01 10:27:33.063] [info] msg='Listen on' addr='127.0.0.1:80'
+logrus::with_field("addr", "127.0.0.1:80").info("Listen on");
 ```
 
 Contains multiple fields log.
 ```cpp
-// info 20240207 15:10:58 msg='with_fieldx2' ip='127.0.0.1' port='80'
-logrus::with_field("ip", "127.0.0.1").with_field("port", 80).info("with_fieldx2");
+// [2024-04-01 10:27:33.063] [info] msg='Listen on' ip='127.0.0.1' port='80'
+logrus::with_field("ip", "127.0.0.1").with_field("port", 80).info("Listen on");
 
-// info 20240207 15:10:58 msg='with_fields' ip='127.0.0.1' port='80'
-logrus::with_fields(logrus::Field("ip", "127.0.0.1"), logrus::Field("port", 80)).info("with_fields");
+// [2024-04-01 10:27:33.063] [info] msg='Listen on' ip='127.0.0.1' port='80'
+logrus::with_fields({{"ip", "127.0.0.1"}, {"port", 80}}).info("Listen on");
 ```
 
 Reuse fields to logging.
 ```cpp
-auto l = logrus::with_field("task_id", 1);
+logrus::Entry l = logrus::with_field("id", 1).with_fields({{"ip", "127.0.0.1"}, {"port", 80}});
 
-// info 20240207 15:10:58 msg='Listen on' task_id='1' ip='127.0.0.1' port='80'
-l.with_fields(logrus::Field("ip", "127.0.0.1"), logrus::Field("port", 80)).info("Listen on");
+// [2024-04-01 10:51:06.381] [info] msg='Listen on' id='1' ip='127.0.0.1' port='80' proto='udp'
+l.with_field("proto", "udp").info("Listen on");
 
-// info 20240207 15:10:58 msg='Listen on' task_id='1' path='xx.sock'
-l.with_field("path", "xx.sock").info("Listen on");
+// [2024-04-01 10:51:06.381] [info] msg='Listen on' id='1' ip='127.0.0.1' port='80' proto='tcp'
+l.with_field("proto", "tcp").info("Listen on");
 ```
 
 If think the code is long, can use macros.
 ```cpp
-// info 20240207 15:18:02 msg='Task done'
-LOG_INFO("Task done");
+// Use macro to log.
 
-// info 20240207 15:10:58 msg='New conn' addr='127.0.0.1:80'
-LOG_INFO("New conn", KV("addr", "127.0.0.1:80"));
+// [2024-04-01 10:51:06.381] [info] msg='hello world!'
+LOG_INFO("hello world!");
 
-// info 20240207 15:10:58 msg='Updated version' from='1.6.1' to='2.0.0' task_id='2'
-LOG_INFO("Updated version", KV("from", "1.6.1"), KV("to", "2.0.0"), KV("task_id", 2));
+// [2024-04-01 10:51:06.381] [info] msg='Listen on' port='80'
+LOG_INFO("Listen on", KV("port", 80));
+
+// [2024-04-01 10:51:06.381] [info] msg='Listen on' ip='127.0.0.1' port='80'
+LOG_INFO("Listen on", KV("ip", "127.0.0.1"), KV("port", 80));
+
+// [2024-04-01 11:19:00.537] [fatal] msg='Fail to Listen' ip='127.0.0.1' port='80'
+LOG_FATAL("Fail to Listen", KV("ip", "127.0.0.1"), KV("port", 80));
 ```
+
+**Recommend using macros to make your logs more structured.**
 
 ## TODO
 1. Add custom *Formatter*.
 2. Add *spdlog::logger* option.
-3. Improve the function definitions of *const T &* and *T &&*

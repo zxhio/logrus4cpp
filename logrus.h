@@ -8,243 +8,221 @@
 // Date:    2024/02/06 14:49:29
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#include <map>
+#include <variant>
+#include <vector>
 
-#include <spdlog/spdlog.h>
+#include <spdlog/fmt/fmt.h>
 
 namespace logrus {
 
-template <size_t N> struct Literal {
-  constexpr Literal(const char (&literal)[N])
-      : Literal(literal, std::make_index_sequence<N>{}) {}
+#define SPDLOG_LEVEL_TRACE 0
+#define SPDLOG_LEVEL_DEBUG 1
+#define SPDLOG_LEVEL_INFO 2
+#define SPDLOG_LEVEL_WARN 3
+#define SPDLOG_LEVEL_ERROR 4
+#define SPDLOG_LEVEL_CRITICAL 5
 
-  constexpr Literal(const Literal<N> &literal) : Literal(literal.s) {}
-
-  template <size_t N1, size_t... I1, size_t N2, size_t... I2>
-  constexpr Literal(const char (&str1)[N1], std::index_sequence<I1...>,
-                    const char (&str2)[N2], std::index_sequence<I2...>)
-      : s{str1[I1]..., str2[I2]..., '\0'} {}
-
-  template <size_t... I>
-  constexpr Literal(const char (&str)[N], std::index_sequence<I...>)
-      : s{str[I]...} {}
-
-  char s[N];
+enum Level : int {
+  kTrace = SPDLOG_LEVEL_TRACE,
+  kDebug = SPDLOG_LEVEL_DEBUG,
+  kInfo = SPDLOG_LEVEL_INFO,
+  kWarn = SPDLOG_LEVEL_WARN,
+  kError = SPDLOG_LEVEL_ERROR,
+  kFatal = SPDLOG_LEVEL_CRITICAL,
 };
 
-template <size_t N> constexpr auto make_literal(const char (&str)[N]) {
-  return Literal(str);
+void logto(const char *file, int line, const char *func, Level level,
+           const char *data, size_t n);
+
+const char kFieldMsgKey[] = "msg";
+const char kFieldErrKey[] = "error";
+const char kFieldDelim[] = "=";
+const char kFieldValueQuoted[] = "'";
+
+template <size_t N>
+constexpr size_t strlenConst(const char (&str)[N]) {
+  return N - 1;
 }
 
-template <size_t N> constexpr auto make_literal(const Literal<N> &literal) {
-  return Literal(literal);
-}
+using ValueType =
+    std::variant<int8_t, uint8_t, int16_t, uint16_t, int32_t, uint32_t,
+                 uint64_t, float, double, bool, std::string, const char *>;
 
-template <size_t N1, size_t N2>
-constexpr auto make_literal(const char (&str1)[N1], const char (&str2)[N2]) {
-  return Literal<N1 + N2 - 1>(str1, std::make_index_sequence<N1 - 1>{}, str2,
-                              std::make_index_sequence<N2 - 1>{});
-}
+template <typename T = ValueType>
+class BasicEntry {
+public:
+  using FieldType = std::pair<std::string, T>;
 
-template <size_t N1, size_t N2>
-constexpr auto make_literal(const Literal<N1> &literal1,
-                            const Literal<N2> &literal2) {
-  return make_literal(literal1.s, literal2.s);
-}
+  BasicEntry() {}
 
-template <size_t N1, size_t N2>
-constexpr auto make_literal(const char (&str)[N1], const Literal<N2> &literal) {
-  return make_literal(str, literal.s);
-}
+  BasicEntry(const std::initializer_list<FieldType> &fields)
+      : fields_(fields) {}
 
-template <size_t N1, size_t N2>
-constexpr auto make_literal(const Literal<N1> &literal, const char (&str)[N2]) {
-  return make_literal(literal.s, str);
-}
+  template <typename T1>
+  BasicEntry(const std::string &k, const T1 &v) : BasicEntry({{k, v}}) {}
 
-template <size_t N1, typename... Args>
-constexpr auto make_literal(const char (&str)[N1], const Args &...args) {
-  return make_literal(str, make_literal(args...));
-}
+  template <typename T1>
+  BasicEntry(const std::string &k, T1 &&v)
+      : BasicEntry({{k, std::forward<T1>(v)}}) {}
 
-template <size_t N1, typename... Args>
-constexpr auto make_literal(const Literal<N1> &literal, const Args &...args) {
-  return make_literal(literal, make_literal(args...));
-}
+  BasicEntry with_fields(const std::initializer_list<FieldType> &fields) const {
+    BasicEntry entry;
+    entry.fields_ = fields_;
+    std::copy(fields.begin(), fields.end(), std::back_inserter(entry.fields_));
+    return entry;
+  }
 
-template <size_t N, typename T> struct Field {
-  Literal<N> key;
-  T value;
+  template <typename T1>
+  BasicEntry with_field(const std::string &k, const T1 &v) const {
+    return with_fields({{k, v}});
+  }
 
-  constexpr Field(const char (&k)[N], T &&v)
-      : key(k), value(std::forward<T>(v)) {}
+  template <typename T1>
+  BasicEntry with_field(const std::string &k, T1 &&v) const {
+    return with_fields({{k, std::forward<T1>(v)}});
+  }
 
-  constexpr Field(const Literal<N> &k, T &&v)
-      : key(k), value(std::forward<T>(v)) {}
+#define LOGRUS_DECLARE_ENTRY_LOG(logfunc, level)                               \
+  template <size_t N>                                                          \
+  void logfunc(const char(&msg)[N]) const {                                    \
+    return log("", 0, "", level, msg);                                         \
+  }
 
-  constexpr Field(const char (&k)[N], const T &v) : key(k), value(v) {}
+  LOGRUS_DECLARE_ENTRY_LOG(trace, Level::kTrace);
+  LOGRUS_DECLARE_ENTRY_LOG(debug, Level::kDebug);
+  LOGRUS_DECLARE_ENTRY_LOG(info, Level::kInfo);
+  LOGRUS_DECLARE_ENTRY_LOG(warn, Level::kWarn);
+  LOGRUS_DECLARE_ENTRY_LOG(error, Level::kError);
+  LOGRUS_DECLARE_ENTRY_LOG(fatal, Level::kFatal);
+#undef LOGRUS_DECLARE_ENTRY_LOG
 
-  constexpr Field(const Literal<N> k, const T &v) : key(k), value(v) {}
+#define LOGRUS_DECLARE_ENTRY_LOG_WITH_LOC(logfunc, level)                      \
+  template <size_t N>                                                          \
+  void logfunc(const char *file, int line, const char *func,                   \
+               const char(&msg)[N]) const {                                    \
+    return log(file, line, func, level, msg);                                  \
+  }
+
+  LOGRUS_DECLARE_ENTRY_LOG_WITH_LOC(trace, Level::kTrace);
+  LOGRUS_DECLARE_ENTRY_LOG_WITH_LOC(debug, Level::kDebug);
+  LOGRUS_DECLARE_ENTRY_LOG_WITH_LOC(info, Level::kInfo);
+  LOGRUS_DECLARE_ENTRY_LOG_WITH_LOC(warn, Level::kWarn);
+  LOGRUS_DECLARE_ENTRY_LOG_WITH_LOC(error, Level::kError);
+  LOGRUS_DECLARE_ENTRY_LOG_WITH_LOC(fatal, Level::kFatal);
+#undef LOGRUS_DECLARE_ENTRY_LOG_WITH_LOC
+
+private:
+  template <size_t N>
+  void log(const char *file, int line, const char *func, Level level,
+           const char (&msg)[N]) const {
+    fmt::basic_memory_buffer<char, 256> buf;
+
+    // Handle msg field
+    std::copy_n(kFieldMsgKey, strlenConst(kFieldMsgKey),
+                std::back_inserter(buf));
+    std::copy_n(kFieldDelim, strlenConst(kFieldDelim), std::back_inserter(buf));
+    std::copy_n(kFieldValueQuoted, strlenConst(kFieldValueQuoted),
+                std::back_inserter(buf));
+    std::copy_n(msg, strlenConst(msg), std::back_inserter(buf));
+    std::copy_n(kFieldValueQuoted, strlenConst(kFieldValueQuoted),
+                std::back_inserter(buf));
+
+    // Handle normal fields
+    for (const auto &pair : fields_) {
+      std::visit(
+          [&](const auto &value) {
+            std::string s =
+                fmt::format(" {}={}{}{}", pair.first, kFieldValueQuoted, value,
+                            kFieldValueQuoted);
+            std::copy_n(s.begin(), s.size(), std::back_inserter(buf));
+          },
+          pair.second);
+    }
+    buf.push_back('\0');
+
+    logto(file, line, func, level, buf.data(), buf.size());
+  }
+
+  template <size_t N>
+  void log(Level level, const char (&msg)[N]) const {
+    return log("", 0, "", level, msg);
+  }
+
+private:
+  std::vector<FieldType> fields_;
 };
 
-template <size_t N, typename T> Field(const char (&)[N], T) -> Field<N, T>;
+using Entry = BasicEntry<>;
 
-template <size_t N, typename... Args> struct Formatter {
-  Literal<N> fmt;
-  std::tuple<Args...> args;
-
-  Formatter(const Literal<N> &fmt, const std::tuple<Args...> &args)
-      : fmt(fmt), args(args) {}
-
-  Formatter(const Literal<N> &fmt, std::tuple<Args...> &&args)
-      : fmt(fmt), args(std::forward<std::tuple<Args...>>(args)) {}
-
-  void log(spdlog::level::level_enum level) {
-    std::apply(
-        [&](Args &&...args) {
-          spdlog::log(level, fmt.s, std::forward<Args>(args)...);
-        },
-        std::forward<std::tuple<Args...>>(args));
-  }
-};
-
-template <size_t N, typename T>
-constexpr auto make_format_args(const Field<N, T> &field) {
-  return Formatter<N + 5, T>(make_literal(field.key, "='{}'"), field.value);
+template <typename T>
+Entry with_field(const std::string &k, const T &v) {
+  return Entry(k, v);
 }
 
-template <size_t N1, typename T1, size_t N2, typename... Args>
-constexpr auto make_format_args(const Field<N1, T1> &field,
-                                const Formatter<N2, Args...> &formatter) {
-  return Formatter<N1 + N2 + 5, T1, Args...>(
-      make_literal(field.key, "='{}' ", formatter.fmt),
-      std::tuple_cat(std::tie(field.value), formatter.args));
+template <typename T>
+Entry with_field(const std::string &k, T &&v) {
+  return Entry(k, std::forward<T>(v));
 }
 
-template <size_t N1, typename T1, size_t N2, typename... Args>
-constexpr auto make_format_args(const Field<N1, T1> &field,
-                                Formatter<N2, Args...> &&formatter) {
-  return Formatter<N1 + N2 + 5, T1, Args...>(
-      make_literal(field.key, "='{}' ", formatter.fmt),
-      std::tuple_cat(std::tie(field.value), formatter.args));
+template <typename T = ValueType>
+Entry with_fields(
+    const std::initializer_list<typename Entry::FieldType> &fields) {
+  return Entry(fields);
 }
 
-template <size_t N1, typename T1, typename... Fields>
-constexpr auto make_format_args(const Field<N1, T1> &field,
-                                Fields &&...fileds) {
-  return make_format_args(field,
-                          make_format_args(std::forward<Fields>(fileds)...));
-}
-
-template <typename Tuple, size_t... Idx>
-constexpr auto make_formatter(const Tuple &tpl, std::index_sequence<Idx...>) {
-  return make_format_args(std::get<Idx>(tpl)...);
-}
-
-template <typename... Fields> struct Entry {
-  std::tuple<Fields...> fields;
-
-  template <size_t N, typename T>
-  constexpr Entry(const Field<N, T> &field) : fields(std::make_tuple(field)) {}
-
-  constexpr Entry(std::tuple<Fields...> &&fields) : fields(fields) {}
-
-  constexpr Entry(const std::tuple<Fields...> &fields) : fields(fields) {}
-
-  template <size_t N, typename T>
-  constexpr auto with_field(const char (&k)[N], const T &v) {
-    return with_fields(Field(k, v));
+#define LOGRUS_DECLARE_LOG_WITH_LOC(logfunc)                                   \
+  template <size_t N>                                                          \
+  void logfunc(const char *file, int line, const char *func,                   \
+               const char(&msg)[N]) {                                          \
+    return Entry{}.logfunc(file, line, func, msg);                             \
   }
 
-  template <typename... Fields1>
-  constexpr auto with_fields(const Fields1 &...fields1) {
-    return Entry<Fields..., Fields1...>(
-        std::tuple_cat(fields, std::tie(fields1...)));
+LOGRUS_DECLARE_LOG_WITH_LOC(trace);
+LOGRUS_DECLARE_LOG_WITH_LOC(debug);
+LOGRUS_DECLARE_LOG_WITH_LOC(info);
+LOGRUS_DECLARE_LOG_WITH_LOC(warn);
+LOGRUS_DECLARE_LOG_WITH_LOC(error);
+LOGRUS_DECLARE_LOG_WITH_LOC(fatal);
+#undef LOGRUS_DECLARE_LOG_WITH_LOC
+
+#define LOGRUS_DECLARE_LOG(logfunc)                                            \
+  template <size_t N>                                                          \
+  void logfunc(const char(&msg)[N]) {                                          \
+    return Entry{}.logfunc(msg);                                               \
   }
 
-  template <size_t N1>
-  void log(const char (&msg)[N1], spdlog::level::level_enum lvl) {
-    make_formatter(std::tuple_cat(std::make_tuple(Field("msg", msg)), fields),
-                   std::make_index_sequence<sizeof...(Fields) + 1>{})
-        .log(lvl);
-  }
-
-  template <size_t N1> void trace(const char (&msg)[N1]) {
-    log(msg, spdlog::level::trace);
-  }
-
-  template <size_t N1> void debug(const char (&msg)[N1]) {
-    log(msg, spdlog::level::debug);
-  }
-
-  template <size_t N1> void info(const char (&msg)[N1]) {
-    log(msg, spdlog::level::info);
-  }
-
-  template <size_t N1> void warn(const char (&msg)[N1]) {
-    log(msg, spdlog::level::warn);
-  }
-
-  template <size_t N1> void error(const char (&msg)[N1]) {
-    log(msg, spdlog::level::err);
-  }
-
-  template <size_t N1> void fatal(const char (&msg)[N1]) {
-    log(msg, spdlog::level::critical);
-    std::exit(1);
-  }
-};
-
-template <size_t N, typename T>
-Entry(const Field<N, T> &field) -> Entry<Field<N, T>>;
-
-template <size_t N, typename T>
-constexpr auto with_field(const char (&k)[N], const T &v) {
-  return Entry(Field(k, v));
-}
-
-template <size_t N, typename T, typename... Fields>
-constexpr auto with_fields(const Field<N, T> &field, const Fields &...fields) {
-  return Entry(std::make_tuple(field, fields...));
-}
-
-template <size_t N, typename... Fields>
-void trace(const char (&msg)[N], const Fields &...fields) {
-  Entry(std::forward_as_tuple(fields...)).trace(msg);
-}
-
-template <size_t N, typename... Fields>
-void debug(const char (&msg)[N], const Fields &...fields) {
-  Entry(std::forward_as_tuple(fields...)).debug(msg);
-}
-
-template <size_t N, typename... Fields>
-void info(const char (&msg)[N], const Fields &...fields) {
-  Entry(std::forward_as_tuple(fields...)).info(msg);
-}
-
-template <size_t N, typename... Fields>
-void warn(const char (&msg)[N], const Fields &...fields) {
-  Entry(std::forward_as_tuple(fields...)).warn(msg);
-}
-
-template <size_t N, typename... Fields>
-void error(const char (&msg)[N], const Fields &...fields) {
-  Entry(std::forward_as_tuple(fields...)).error(msg);
-}
-
-template <size_t N, typename... Fields>
-void fatal(const char (&msg)[N], const Fields &...fields) {
-  Entry(std::forward_as_tuple(fields...)).fatal(msg);
-}
+LOGRUS_DECLARE_LOG(trace);
+LOGRUS_DECLARE_LOG(debug);
+LOGRUS_DECLARE_LOG(info);
+LOGRUS_DECLARE_LOG(warn);
+LOGRUS_DECLARE_LOG(error);
+LOGRUS_DECLARE_LOG(fatal);
+#undef LOGRUS_DECLARE_LOG
 
 } // namespace logrus
 
-#define KV(k, v) logrus::Field(k, v)
+#define KV(k, v)                                                               \
+  { k, v }
 
-#define LOG_TRACE(...) logrus::trace(__VA_ARGS__)
-#define LOG_DEBUG(...) logrus::debug(__VA_ARGS__)
-#define LOG_INFO(...) logrus::info(__VA_ARGS__)
-#define LOG_WARN(...) logrus::warn(__VA_ARGS__)
-#define LOG_ERROR(...) logrus::error(__VA_ARGS__)
-#define LOG_FATAL(...) logrus::fatal(__VA_ARGS__)
+#ifdef LOGRUS_WITH_LOC
+#define LOG_TRACE(msg, ...)                                                    \
+  logrus::Entry({__VA_ARGS__}).trace(__FILE__, __LINE__, __FUNCTION__, msg)
+#define LOG_DEBUG(msg, ...)                                                    \
+  logrus::Entry({__VA_ARGS__}).debug(__FILE__, __LINE__, __FUNCTION__, msg)
+#define LOG_INFO(msg, ...)                                                     \
+  logrus::Entry({__VA_ARGS__}).info(__FILE__, __LINE__, __FUNCTION__, msg)
+#define LOG_WARN(msg, ...)                                                     \
+  logrus::Entry({__VA_ARGS__}).warn(__FILE__, __LINE__, __FUNCTION__, msg)
+#define LOG_ERROR(msg, ...)                                                    \
+  logrus::Entry({__VA_ARGS__}).error(__FILE__, __LINE__, __FUNCTION__, msg)
+#define LOG_FATAL(msg, ...)                                                    \
+  logrus::Entry({__VA_ARGS__}).fatal(__FILE__, __LINE__, __FUNCTION__, msg)
+#else
+#define LOG_TRACE(msg, ...) logrus::Entry({__VA_ARGS__}).trace(msg)
+#define LOG_DEBUG(msg, ...) logrus::Entry({__VA_ARGS__}).debug(msg)
+#define LOG_INFO(msg, ...) logrus::Entry({__VA_ARGS__}).info(msg)
+#define LOG_WARN(msg, ...) logrus::Entry({__VA_ARGS__}).warn(msg)
+#define LOG_ERROR(msg, ...) logrus::Entry({__VA_ARGS__}).error(msg)
+#define LOG_FATAL(msg, ...) logrus::Entry({__VA_ARGS__}).fatal(msg)
+#endif
