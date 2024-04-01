@@ -156,19 +156,22 @@ private:
 using Entry = BasicEntry<>;
 
 template <typename T>
-Entry with_field(const std::string &k, const T &v) {
+inline Entry with_field(const std::string &k, const T &v) {
   return Entry(k, v);
 }
 
 template <typename T>
-Entry with_field(const std::string &k, T &&v) {
+inline Entry with_field(const std::string &k, T &&v) {
   return Entry(k, std::forward<T>(v));
 }
 
-template <typename T = ValueType>
-Entry with_fields(
-    const std::initializer_list<typename Entry::FieldType> &fields) {
+inline Entry
+with_fields(const std::initializer_list<typename Entry::FieldType> &fields) {
   return Entry(fields);
+}
+
+inline Entry with_error(int errnum) {
+  return Entry(kFieldErrKey, strerror(errnum));
 }
 
 #define LOGRUS_DECLARE_LOG_WITH_LOC(logfunc)                                   \
@@ -204,6 +207,8 @@ LOGRUS_DECLARE_LOG(fatal);
 
 #define KV(k, v)                                                               \
   { k, v }
+
+#define KERR(errnum) KV(logrus::kFieldErrKey, strerror(errnum))
 
 #ifdef LOGRUS_WITH_LOC
 #define LOG_TRACE(msg, ...)                                                    \

@@ -39,6 +39,12 @@ l.with_field("proto", "udp").info("Listen on");
 l.with_field("proto", "tcp").info("Listen on");
 ```
 
+Error field handle.
+```cpp
+// [2024-04-01 11:44:41.640] [error] msg='Fail to open' error='Operation not permitted' file='foo'
+logrus::with_error(errno).with_field("file", "foo").error("Fail to open");
+```
+
 If think the code is long, can use macros.
 ```cpp
 // Use macro to log.
@@ -52,8 +58,11 @@ LOG_INFO("Listen on", KV("port", 80));
 // [2024-04-01 10:51:06.381] [info] msg='Listen on' ip='127.0.0.1' port='80'
 LOG_INFO("Listen on", KV("ip", "127.0.0.1"), KV("port", 80));
 
-// [2024-04-01 11:19:00.537] [fatal] msg='Fail to Listen' ip='127.0.0.1' port='80'
-LOG_FATAL("Fail to Listen", KV("ip", "127.0.0.1"), KV("port", 80));
+// [2024-04-01 11:19:00.537] [fatal] msg='Fail to listen' ip='127.0.0.1' port='80'
+LOG_FATAL("Fail to listen", KV("ip", "127.0.0.1"), KV("port", 80));
+
+// [2024-04-01 11:44:41.640] [error] msg='Fail to open' error='Operation not permitted' file='foo'
+LOG_ERROR("Fail to open", KERR(errno), KV("file", "foo"));
 ```
 
 **Recommend using macros to make your logs more structured.**

@@ -22,5 +22,6 @@ int main() {
   LOG_INFO("Listen on", KV("port", 80));
   LOG_INFO("Listen on", KV("ip", "127.0.0.1"), KV("port", 80));
 
-  LOG_FATAL("Fail to Listen", KV("ip", "127.0.0.1"), KV("port", 80));
+  logrus::with_error(EPERM).with_field("file", "foo").error("Fail to open");
+  LOG_ERROR("Fail to open", KERR(EPERM), KV("file", "foo"));
 }
