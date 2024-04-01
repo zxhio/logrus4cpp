@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -std=c++17 -march=native -O2 -Wall -Werror -static -I spdlog/include
+CXXFLAGS = -std=c++17 -march=native -O2 -Wall -Werror
 
 SRCS = \
 	logrus.cpp \
@@ -11,7 +11,7 @@ TARGETS = example
 all: $(TARGETS)
 
 $(TARGETS): $(OBJS)
-	$(CXX) $(CXXFLAGS) $(OBJS) -o $@
+	$(CXX) $(CXXFLAGS) $(OBJS) -o $@ -lfmt
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@

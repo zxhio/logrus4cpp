@@ -8,11 +8,11 @@
 // Date:    2024/02/06 14:49:29
 //===----------------------------------------------------------------------===//
 
-#include <map>
+#include <algorithm>
 #include <variant>
 #include <vector>
 
-#include <spdlog/fmt/fmt.h>
+#include <fmt/format.h>
 
 namespace logrus {
 
