@@ -46,8 +46,9 @@ constexpr size_t strlen_const(const char (&str)[N]) {
 }
 
 using ValueType =
-    std::variant<int8_t, uint8_t, int16_t, uint16_t, int32_t, uint32_t,
-                 uint64_t, float, double, bool, std::string, const char *>;
+    std::variant<char, unsigned char, short, unsigned short, int, unsigned int,
+                 long, unsigned long, long long, unsigned long long, float,
+                 double, bool, std::string, const char *>;
 
 using FieldType = std::pair<std::string, ValueType>;
 
