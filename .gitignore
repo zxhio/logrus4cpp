@@ -1,6 +1,10 @@
 .cache/
 spdlog/
 example
+benchmark
 *.o
+*.d
+*.a
 *.log
 compile_commands.json
+third-party/benchmark
